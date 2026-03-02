@@ -28,6 +28,8 @@
     <script src="https://unpkg.com/hydra-synth"></script>
     <script>
     const hydra = new Hydra({ detectAudio: false });
+    // Initialize camera
+    s0.initCam();
 
     window.activeNotes = new Map(); 
     window.lastNote = 60;
