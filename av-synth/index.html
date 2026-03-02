@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Live Synth</title>
+    <style>
+    body { 
+      margin: 0; 
+      overflow: hidden;
+      background: #000;
+    }
+    canvas { 
+      width: 100vw; 
+      height: 100vh; 
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #0f0;
+      font-family: monospace;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      font-size: 12px;
+    }
+    </style>
+  </head>
+  <body>
+    <script src="https://unpkg.com/hydra-synth"></script>
+    <script>
+    const hydra = new Hydra({ detectAudio: false });
+
+    window.activeNotes = new Map(); 
+    window.lastNote = 60;
+    window.noteCount = 0;
+    window.avgVelocity = 0;
+
+    const ws = new WebSocket('ws://localhost:8765');
+
+    ws.onopen = () => {};
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      if (data.type === 'note_on' && data.velocity > 0) {
+        activeNotes.set(data.note, data.velocity);
+        window.lastNote = data.note;
+      } else {
+        activeNotes.delete(data.note);
+      }
+      
+      window.noteCount = activeNotes.size;
+      
+      if (activeNotes.size > 0) {
+        const velocities = Array.from(activeNotes.values());
+        window.avgVelocity = velocities.reduce((a, b) => a + b, 0) / velocities.length;
+      } else {
+        window.avgVelocity = 0;
+      }
+      
+      const notesStr = Array.from(activeNotes.keys()).join(', ');
+      document.getElementById('midi').innerHTML = 
+        `Active notes: ${noteCount}<br>` +
+        `Notes: [${notesStr}]<br>` +
+        `Last: ${lastNote} | Avg velocity: ${Math.round(avgVelocity)}`;
+    };
+
+    ws.onerror = () => {};
+
+    ws.onclose = () => {};
+    </script>
+
+    <script src="visual.js"></script>
+    <script>
+    runVisual();
+    </script>
+  </body>
+</html>
