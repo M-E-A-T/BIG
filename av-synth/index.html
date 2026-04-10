@@ -31,23 +31,42 @@
     // Initialize camera
     s0.initCam();
 
-    window.activeNotes = new Map(); 
+    window.wsPort = new URLSearchParams(window.location.search).get('port') || '8765';
+
+    window.activeNotes = new Map();  // keys only (channel 0)
     window.lastNote = 60;
     window.noteCount = 0;
     window.avgVelocity = 0;
+    window.ccValues = new Array(9).fill(0);
+    window.activePads = new Map();   // pads only (channel 9)
 
-    const ws = new WebSocket('ws://localhost:8765');
+    const ws = new WebSocket(`ws://localhost:${window.wsPort}`);
 
     ws.onopen = () => {};
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      
+      const isPad = data.channel === 9;
+
       if (data.type === 'note_on' && data.velocity > 0) {
-        activeNotes.set(data.note, data.velocity);
-        window.lastNote = data.note;
-      } else {
-        activeNotes.delete(data.note);
+        if (isPad) {
+          activePads.set(data.note, data.velocity);
+        } else {
+          activeNotes.set(data.note, data.velocity);
+          window.lastNote = data.note;
+        }
+      } else if (data.type === 'note_off' || (data.type === 'note_on' && data.velocity === 0)) {
+        if (isPad) {
+          activePads.delete(data.note);
+        } else {
+          activeNotes.delete(data.note);
+        }
+      } else if (data.type === 'control_change') {
+        if (data.control === 1) {
+          ccValues[8] = data.value;
+        } else if (data.control >= 70 && data.control <= 77) {
+          ccValues[data.control - 70] = data.value;
+        }
       }
       
       window.noteCount = activeNotes.size;
@@ -60,10 +79,13 @@
       }
       
       const notesStr = Array.from(activeNotes.keys()).join(', ');
+      const padsStr = Array.from(activePads.keys()).join(', ');
       document.getElementById('midi').innerHTML = 
         `Active notes: ${noteCount}<br>` +
         `Notes: [${notesStr}]<br>` +
-        `Last: ${lastNote} | Avg velocity: ${Math.round(avgVelocity)}`;
+        `Pads: [${padsStr}]<br>` +
+        `Last: ${lastNote} | Avg velocity: ${Math.round(avgVelocity)}<br>` +
+        `CC: [${ccValues.map(v => Math.round(v)).join(', ')}]`;
     };
 
     ws.onerror = () => {};
